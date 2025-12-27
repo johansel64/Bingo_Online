@@ -56,14 +56,55 @@ export const generateRoomCode = () => {
   return code;
 };
 
-// Obtener número aleatorio del bingo (1-75) que no haya salido
-export const drawNumber = (drawnNumbers) => {
-  const availableNumbers = [];
-  for (let i = 1; i <= 75; i++) {
-    if (!drawnNumbers.includes(i)) {
-      availableNumbers.push(i);
-    }
+// ✅ MEJORADO: Obtener rangos de números válidos según el modo de juego
+export const getValidNumberRanges = (gameMode) => {
+  switch (gameMode) {
+    case 'corners':
+      // 4 Esquinas: Solo columnas B (1-15) y O (61-75)
+      // Esquinas: [0][0], [0][4], [4][0], [4][4]
+      return [
+        [1, 15],    // Columna B
+        [61, 75]    // Columna O
+      ];
+
+    case 'X':
+      // Modo X: Ambas diagonales
+      // Diagonal principal: [0][0], [1][1], [2][2], [3][3], [4][4]
+      // Diagonal secundaria: [0][4], [1][3], [2][2], [3][1], [4][0]
+      // Centro [2][2] es FREE en ambas diagonales
+      // Solo necesita: B, I, G, O (NO necesita N porque es FREE)
+      return [
+        [1, 15],    // Columna B
+        [16, 30],   // Columna I
+        [46, 60],   // Columna G
+        [61, 75]    // Columna O
+        // ❌ NO incluye [31, 45] (Columna N) porque [2][2] es FREE
+      ];
+
+    case 'full':
+    case 'line':
+    case 'L':
+    default:
+      // Todos los demás modos necesitan cualquier número
+      return [
+        [1, 75]     // Todos los números
+      ];
   }
+};
+
+// ✅ MEJORADO: Obtener número aleatorio según el modo de juego
+export const drawNumber = (drawnNumbers, gameMode = 'full') => {
+  const ranges = getValidNumberRanges(gameMode);
+  const availableNumbers = [];
+  
+  // Generar lista de números disponibles según los rangos del modo
+  ranges.forEach(([min, max]) => {
+    for (let i = min; i <= max; i++) {
+      if (!drawnNumbers.includes(i)) {
+        availableNumbers.push(i);
+      }
+    }
+  });
   
   if (availableNumbers.length === 0) return null;
   
@@ -88,7 +129,7 @@ export const checkWin = (card, markedNumbers, pattern) => {
       // Una Columna Vertical completa
       let isColumFull = Array.from({ length: 5 }).some((_, col) => 
                           card.every(row => isMarked(row[col]))
-                        )
+                    )
       return isRowFull || isColumFull;
 
     case 'L':
@@ -134,4 +175,88 @@ export const GAME_MODES = {
   L: 'L',
   X: 'X',
   corners: '4 Esquinas'
+};
+
+// ✅ MEJORADO: Obtener descripción de los números que saldrán según el modo
+export const getGameModeDescription = (gameMode) => {
+  switch (gameMode) {
+    case 'corners':
+      return 'Solo saldrán números B (1-15) y O (61-75) - ¡Juego rápido! (~5-7 min)';
+    case 'X':
+      return 'Solo saldrán números B (1-15), I (16-30), G (46-60) y O (61-75) - ¡Juego rápido! (~8-10 min)';
+    case 'full':
+      return 'Saldrán todos los números del 1 al 75 - Juego completo (~20-25 min)';
+    case 'line':
+      return 'Saldrán todos los números del 1 al 75 - Juego medio (~15-20 min)';
+    case 'L':
+      return 'Saldrán todos los números del 1 al 75 - Juego medio (~15-20 min)';
+    default:
+      return 'Saldrán todos los números del 1 al 75';
+  }
+};
+
+// ✅ NUEVO: Obtener total de números disponibles según el modo
+export const getTotalNumbers = (gameMode) => {
+  const ranges = getValidNumberRanges(gameMode);
+  let total = 0;
+  
+  ranges.forEach(([min, max]) => {
+    total += (max - min + 1);
+  });
+  
+  return total;
+};
+
+// ✅ NUEVO: Obtener estadísticas del modo de juego
+export const getGameModeStats = (gameMode) => {
+  switch (gameMode) {
+    case 'corners':
+      return {
+        totalNumbers: 30,
+        numbersNeeded: 4,
+        averageTime: '5-7 min',
+        speed: 'Muy Rápido',
+        difficulty: 'Fácil'
+      };
+    case 'X':
+      return {
+        totalNumbers: 60,
+        numbersNeeded: 8,
+        averageTime: '8-10 min',
+        speed: 'Rápido',
+        difficulty: 'Medio'
+      };
+    case 'full':
+      return {
+        totalNumbers: 75,
+        numbersNeeded: 24,
+        averageTime: '20-25 min',
+        speed: 'Normal',
+        difficulty: 'Difícil'
+      };
+    case 'line':
+      return {
+        totalNumbers: 75,
+        numbersNeeded: 5,
+        averageTime: '15-20 min',
+        speed: 'Medio',
+        difficulty: 'Medio'
+      };
+    case 'L':
+      return {
+        totalNumbers: 75,
+        numbersNeeded: 9,
+        averageTime: '15-20 min',
+        speed: 'Medio',
+        difficulty: 'Medio'
+      };
+    default:
+      return {
+        totalNumbers: 75,
+        numbersNeeded: 0,
+        averageTime: 'Variable',
+        speed: 'Normal',
+        difficulty: 'Medio'
+      };
+  }
 };

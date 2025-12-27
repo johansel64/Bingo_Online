@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { doc, getDoc, updateDoc, onSnapshot, arrayUnion } from 'firebase/firestore';
+import { doc, updateDoc, onSnapshot, arrayUnion } from 'firebase/firestore';
 import { db } from '../../utils/firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import { generateBingoCard, drawNumber, checkWin, GAME_MODES } from '../../utils/bingoLogic';
+import { generateBingoCard, drawNumber, checkWin, GAME_MODES, getGameModeDescription } from '../../utils/bingoLogic';
 import BingoCard from '../Game/BingoCard';
 import Tombola from '../Game/Tombola';
 import NumberHistory from '../Game/NumberHistory';
@@ -28,9 +28,6 @@ const GameRoom = () => {
   const roomId = location.state?.roomId;
   const isHost = location.state?.isHost || false;
 
-  const spinSound = useRef(null);
-  const winSound = useRef(null);
-
   // Cargar sala y escuchar cambios en tiempo real
   useEffect(() => {
     if (!roomId) {
@@ -47,15 +44,20 @@ const GameRoom = () => {
         const roomData = snapshot.data();
         setRoom(roomData);
 
-        // Verificar si hay ganador
-        if (roomData.winner && !hasWon) {
+        // ✅ CORREGIDO: Sincronizar winner con Firebase SIEMPRE
+        if (roomData.winner) {
+          // Hay un ganador
           setWinner(roomData.winner);
           
-          // Confetti si soy el ganador
-          if (roomData.winner.id === currentUser.uid) {
+          // Si soy el ganador y aún no he celebrado
+          if (roomData.winner.id === currentUser.uid && !hasWon) {
             setHasWon(true);
             triggerConfetti();
           }
+        } else {
+          // ✅ NUEVO: Si no hay ganador en Firebase, limpiar estado local
+          setWinner(null);
+          setHasWon(false);
         }
       } else {
         setError('Sala no encontrada');
@@ -64,7 +66,7 @@ const GameRoom = () => {
     });
 
     return () => unsubscribe();
-  }, [roomId, currentUser.uid, hasWon]);
+  }, [roomId, currentUser.uid]);  // ✅ CORREGIDO: Removido hasWon de dependencias
 
   // Generar cartón al entrar
   useEffect(() => {
@@ -104,56 +106,20 @@ const GameRoom = () => {
   useEffect(() => {
     if (!isHost && room?.currentNumber) {
       setSpinning(true);
-
-      // playSound(spinSound);
       
       const timer = setTimeout(() => {
         setSpinning(false);
-      }, 3000); // 1 segundo de animación
+      }, 3000);
       
       return () => clearTimeout(timer);
     }
   }, [room?.currentNumber, isHost]);
 
-  useEffect(() => {
-    // Crear y configurar audio de spin
-    // spinSound.current = new Audio('/sounds/spin.wav');
-    // spinSound.current.preload = 'auto';
-    // spinSound.current.load();
-    
-    // Crear y configurar audio de win
-    // winSound.current = new Audio('/sounds/win.wav');
-    // winSound.current.preload = 'auto';
-    // winSound.current.load();
-    
-    // Cleanup
-    return () => {
-      // if (spinSound.current) {
-      //   spinSound.current.pause();
-      //   spinSound.current = null;
-      // }
-      // if (winSound.current) {
-      //   winSound.current.pause();
-      //   winSound.current = null;
-      // }
-    };
-  }, []);
-
-
-  const playSound = (soundRef) => {
-    if (soundRef.current) {
-      soundRef.current.currentTime = 0; // Reiniciar desde el inicio
-      soundRef.current.play().catch(err => {
-        console.log('Error al reproducir audio:', err);
-      });
-    }
-  };
-
   // Girar tómbola (solo host)
   const handleDrawNumber = async () => {
     if (!isHost || !room) return;
 
-    const newNumber = drawNumber(room.drawnNumbers);
+    const newNumber = drawNumber(room.drawnNumbers, room.gameMode);
     
     if (newNumber === null) {
       alert('Todos los números ya salieron');
@@ -161,7 +127,6 @@ const GameRoom = () => {
     }
 
     try {
-      // playSound(spinSound);
       const roomRef = doc(db, 'rooms', roomId);
       await updateDoc(roomRef, {
         currentNumber: newNumber,
@@ -198,8 +163,6 @@ const GameRoom = () => {
     if (hasWon) return;
 
     try {
-      // playSound(winSound);
-
       const roomRef = doc(db, 'rooms', roomId);
       await updateDoc(roomRef, {
         winner: {
@@ -215,6 +178,35 @@ const GameRoom = () => {
     } catch (err) {
       console.error('Error declaring win:', err);
     }
+  };
+
+  // Jugar de nuevo
+  const handlePlayAgain = async () => {
+    if (!isHost) return;
+
+    try {
+      const roomRef = doc(db, 'rooms', roomId);
+      await updateDoc(roomRef, {
+        status: 'waiting',
+        currentNumber: null,
+        drawnNumbers: [],
+        winner: null  // ✅ Esto dispara el reset en todos los clientes
+      });
+      
+      // Resetear estados locales
+      setCard(generateBingoCard());
+      setMarkedNumbers([]);
+      setWinner(null);  // ✅ Reset local inmediato
+      setHasWon(false);  // ✅ Reset local inmediato
+    } catch (err) {
+      console.error('Error restarting game:', err);
+    }
+  };
+
+  // Cambiar cartón (regenerar)
+  const handleChangeCard = () => {
+    setCard(generateBingoCard());
+    setMarkedNumbers([]);
   };
 
   // Cambiar modo de juego (solo host)
@@ -300,6 +292,9 @@ const GameRoom = () => {
                   {GAME_MODES[room.gameMode]}
                 </span>
               </p>
+              <p className="text-sm text-gray-500 mt-1">
+                {getGameModeDescription(room.gameMode)}
+              </p>
             </div>
             <div className="flex gap-2">
               <button
@@ -320,51 +315,91 @@ const GameRoom = () => {
 
         {/* Lobby - Esperando jugadores */}
         {room.status === 'waiting' && (
-          <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-            <h2 className="text-2xl font-bold text-center mb-4">
-              Esperando jugadores...
-            </h2>
-            
-            {isHost && (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-gray-700 font-semibold mb-2">
-                    Selecciona el modo de juego:
-                  </label>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-                    {Object.entries(GAME_MODES).map(([key, label]) => (
-                      <button
-                        key={key}
-                        onClick={() => handleChangeGameMode(key)}
-                        className={`
-                          px-4 py-2 rounded-lg font-semibold transition
-                          ${room.gameMode === key
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                          }
-                        `}
-                      >
-                        {label}
-                      </button>
-                    ))}
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Panel principal del lobby */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Configuración del juego */}
+              <div className="bg-white rounded-lg shadow-lg p-6">
+                <h2 className="text-2xl font-bold text-center mb-4">
+                  Esperando jugadores...
+                </h2>
+                
+                {isHost && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-gray-700 font-semibold mb-2">
+                        Selecciona el modo de juego:
+                      </label>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                        {Object.entries(GAME_MODES).map(([key, label]) => (
+                          <button
+                            key={key}
+                            onClick={() => handleChangeGameMode(key)}
+                            className={`
+                              px-4 py-2 rounded-lg font-semibold transition
+                              ${room.gameMode === key
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                              }
+                            `}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleStartGame}
+                      disabled={room.players.length < 1}
+                      className="w-full bg-green-600 text-white font-bold py-4 rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      🎮 Iniciar Juego
+                    </button>
                   </div>
-                </div>
+                )}
 
-                <button
-                  onClick={handleStartGame}
-                  disabled={room.players.length < 1}
-                  className="w-full bg-green-600 text-white font-bold py-4 rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  🎮 Iniciar Juego
-                </button>
+                {!isHost && (
+                  <p className="text-center text-gray-600">
+                    Esperando que el host inicie el juego...
+                  </p>
+                )}
               </div>
-            )}
 
-            {!isHost && (
-              <p className="text-center text-gray-600">
-                Esperando que el host inicie el juego...
-              </p>
-            )}
+              {/* Mostrar cartón en el lobby con botón para cambiarlo */}
+              {card && (
+                <div className="bg-white rounded-lg shadow-lg p-6">
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-gray-800">
+                      Vista Previa de tu Cartón
+                    </h3>
+                    <button
+                      onClick={handleChangeCard}
+                      className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition flex items-center gap-2"
+                    >
+                      🔄 Cambiar Cartón
+                    </button>
+                  </div>
+                  <BingoCard
+                    card={card}
+                    markedNumbers={[]}
+                    onMarkNumber={() => {}}
+                    disabled={true}
+                  />
+                  <p className="text-center text-sm text-gray-500 mt-3">
+                    Puedes cambiar tu cartón antes de que inicie el juego
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Mostrar jugadores en el lobby */}
+            <div className="lg:col-span-1">
+              <PlayersList
+                players={room.players}
+                hostId={room.hostId}
+              />
+            </div>
           </div>
         )}
 
@@ -376,19 +411,31 @@ const GameRoom = () => {
               <h2 className="text-3xl font-bold text-gray-800 mb-2">
                 ¡BINGO!
               </h2>
-              <p className="text-xl text-gray-700 mb-4">
+              <p className="text-xl text-gray-700 mb-6">
                 <span className="font-semibold text-purple-600">
                   {winner.name}
                 </span>
                 {' '}ganó con patrón{' '}
                 <span className="font-semibold">{GAME_MODES[winner.pattern]}</span>
               </p>
-              <button
-                onClick={() => navigate('/')}
-                className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition"
-              >
-                Volver al inicio
-              </button>
+
+              {/* Botones */}
+              <div className="flex flex-col gap-3">
+                {isHost && (
+                  <button
+                    onClick={handlePlayAgain}
+                    className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition font-semibold"
+                  >
+                    🔄 Jugar de Nuevo
+                  </button>
+                )}
+                <button
+                  onClick={() => navigate('/')}
+                  className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition font-semibold"
+                >
+                  🏠 Volver al Menú Principal
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -397,7 +444,7 @@ const GameRoom = () => {
         {room.status === 'playing' && card && (
           <div className="grid lg:grid-cols-3 gap-6">
             
-            {/* EN MÓVIL: Tómbola/Número ARRIBA (solo visible en pantallas pequeñas) */}
+            {/* EN MÓVIL: Tómbola/Número ARRIBA */}
             <div className="lg:hidden space-y-6">
               {isHost && (
                 <Tombola
@@ -426,7 +473,7 @@ const GameRoom = () => {
               )}
             </div>
 
-            {/* Cartón - siempre en el medio */}
+            {/* Cartón */}
             <div className="lg:col-span-2">
               <BingoCard
                 card={card}
@@ -436,7 +483,7 @@ const GameRoom = () => {
               />
             </div>
 
-            {/* EN DESKTOP: Columna derecha con todos los controles */}
+            {/* EN DESKTOP: Columna derecha */}
             <div className="hidden lg:block space-y-6">
               {isHost && (
                 <Tombola
@@ -475,7 +522,7 @@ const GameRoom = () => {
               />
             </div>
 
-            {/* EN MÓVIL: Historial y jugadores ABAJO del cartón */}
+            {/* EN MÓVIL: Historial y jugadores ABAJO */}
             <div className="lg:hidden space-y-6">
               <NumberHistory
                 drawnNumbers={room.drawnNumbers}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { getBingoLetter } from '../../utils/bingoLogic';
+import { getBingoLetter, getTotalNumbers } from '../../utils/bingoLogic';
 
-const Tombola = ({ onDrawNumber, drawnNumbers, currentNumber, disabled }) => {
+const Tombola = ({ onDrawNumber, drawnNumbers, currentNumber, disabled, gameMode }) => {
   const [spinning, setSpinning] = useState(false);
 
   const handleDraw = async () => {
@@ -16,7 +16,9 @@ const Tombola = ({ onDrawNumber, drawnNumbers, currentNumber, disabled }) => {
     }, 3000);
   };
 
-  const numbersLeft = 75 - drawnNumbers.length;
+  // ✅ CORREGIDO: Calcular según el modo de juego
+  const totalNumbers = getTotalNumbers(gameMode);
+  const numbersLeft = totalNumbers - drawnNumbers.length;
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
@@ -68,7 +70,7 @@ const Tombola = ({ onDrawNumber, drawnNumbers, currentNumber, disabled }) => {
           Números restantes: <span className="font-bold text-purple-600">{numbersLeft}</span>
         </p>
         <p className="text-sm text-gray-500 mt-1">
-          Números sacados: {drawnNumbers.length}
+          Números sacados: {drawnNumbers.length} / {totalNumbers}
         </p>
       </div>
     </div>

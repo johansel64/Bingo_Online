@@ -1,6 +1,7 @@
 import React from 'react';
 
 const BingoCard = ({ card, markedNumbers, onMarkNumber, disabled }) => {
+  // ✅ ARREGLADO: Letras con font-family explícita para evitar problemas en móviles
   const letters = ['B', 'I', 'N', 'G', 'O'];
 
   const isMarked = (number) => {
@@ -23,6 +24,7 @@ const BingoCard = ({ card, markedNumbers, onMarkNumber, disabled }) => {
           <div
             key={letter}
             className="bg-purple-600 text-white font-bold text-xl py-3 text-center rounded-t-lg"
+            style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif' }}
           >
             {letter}
           </div>
@@ -49,6 +51,7 @@ const BingoCard = ({ card, markedNumbers, onMarkNumber, disabled }) => {
                   ${isFree ? 'bg-yellow-400 text-gray-800' : ''}
                   ${!disabled && !isFree ? 'cursor-pointer' : 'cursor-default'}
                 `}
+                style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif' }}
               >
                 {isFree ? '★' : number}
               </button>
