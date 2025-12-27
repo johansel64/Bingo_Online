@@ -291,7 +291,7 @@ Este proyecto es de código abierto.
 
 ## 👨‍💻 Autor
 
-Tu Nombre - [Tu GitHub]
+Tu Nombre - johansel64
 
 ## 🙏 Agradecimientos
 
