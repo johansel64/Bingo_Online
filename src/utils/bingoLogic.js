@@ -56,29 +56,23 @@ export const generateRoomCode = () => {
   return code;
 };
 
-// ✅ MEJORADO: Obtener rangos de números válidos según el modo de juego
+// ✅ NUEVO: Obtener rangos de números válidos según el modo de juego
 export const getValidNumberRanges = (gameMode) => {
   switch (gameMode) {
     case 'corners':
       // 4 Esquinas: Solo columnas B (1-15) y O (61-75)
-      // Esquinas: [0][0], [0][4], [4][0], [4][4]
       return [
         [1, 15],    // Columna B
         [61, 75]    // Columna O
       ];
 
     case 'X':
-      // Modo X: Ambas diagonales
-      // Diagonal principal: [0][0], [1][1], [2][2], [3][3], [4][4]
-      // Diagonal secundaria: [0][4], [1][3], [2][2], [3][1], [4][0]
-      // Centro [2][2] es FREE en ambas diagonales
-      // Solo necesita: B, I, G, O (NO necesita N porque es FREE)
+      // Modo X: Solo B, I, G, O (NO N porque es FREE)
       return [
         [1, 15],    // Columna B
         [16, 30],   // Columna I
         [46, 60],   // Columna G
         [61, 75]    // Columna O
-        // ❌ NO incluye [31, 45] (Columna N) porque [2][2] es FREE
       ];
 
     case 'full':
@@ -90,6 +84,18 @@ export const getValidNumberRanges = (gameMode) => {
         [1, 75]     // Todos los números
       ];
   }
+};
+
+// ✅ NUEVO: Obtener total de números disponibles según el modo
+export const getTotalNumbers = (gameMode) => {
+  const ranges = getValidNumberRanges(gameMode);
+  let total = 0;
+  
+  ranges.forEach(([min, max]) => {
+    total += (max - min + 1);
+  });
+  
+  return total;
 };
 
 // ✅ MEJORADO: Obtener número aleatorio según el modo de juego
@@ -177,7 +183,7 @@ export const GAME_MODES = {
   corners: '4 Esquinas'
 };
 
-// ✅ MEJORADO: Obtener descripción de los números que saldrán según el modo
+// ✅ NUEVO: Obtener descripción de los números que saldrán según el modo
 export const getGameModeDescription = (gameMode) => {
   switch (gameMode) {
     case 'corners':
@@ -192,71 +198,5 @@ export const getGameModeDescription = (gameMode) => {
       return 'Saldrán todos los números del 1 al 75 - Juego medio (~15-20 min)';
     default:
       return 'Saldrán todos los números del 1 al 75';
-  }
-};
-
-// ✅ NUEVO: Obtener total de números disponibles según el modo
-export const getTotalNumbers = (gameMode) => {
-  const ranges = getValidNumberRanges(gameMode);
-  let total = 0;
-  
-  ranges.forEach(([min, max]) => {
-    total += (max - min + 1);
-  });
-  
-  return total;
-};
-
-// ✅ NUEVO: Obtener estadísticas del modo de juego
-export const getGameModeStats = (gameMode) => {
-  switch (gameMode) {
-    case 'corners':
-      return {
-        totalNumbers: 30,
-        numbersNeeded: 4,
-        averageTime: '5-7 min',
-        speed: 'Muy Rápido',
-        difficulty: 'Fácil'
-      };
-    case 'X':
-      return {
-        totalNumbers: 60,
-        numbersNeeded: 8,
-        averageTime: '8-10 min',
-        speed: 'Rápido',
-        difficulty: 'Medio'
-      };
-    case 'full':
-      return {
-        totalNumbers: 75,
-        numbersNeeded: 24,
-        averageTime: '20-25 min',
-        speed: 'Normal',
-        difficulty: 'Difícil'
-      };
-    case 'line':
-      return {
-        totalNumbers: 75,
-        numbersNeeded: 5,
-        averageTime: '15-20 min',
-        speed: 'Medio',
-        difficulty: 'Medio'
-      };
-    case 'L':
-      return {
-        totalNumbers: 75,
-        numbersNeeded: 9,
-        averageTime: '15-20 min',
-        speed: 'Medio',
-        difficulty: 'Medio'
-      };
-    default:
-      return {
-        totalNumbers: 75,
-        numbersNeeded: 0,
-        averageTime: 'Variable',
-        speed: 'Normal',
-        difficulty: 'Medio'
-      };
   }
 };
