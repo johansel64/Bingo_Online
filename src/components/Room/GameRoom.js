@@ -447,12 +447,13 @@ const GameRoom = () => {
             {/* EN MÓVIL: Tómbola/Número ARRIBA */}
             <div className="lg:hidden space-y-6">
               {isHost && (
-                <Tombola
-                  onDrawNumber={handleDrawNumber}
-                  drawnNumbers={room.drawnNumbers}
-                  currentNumber={room.currentNumber}
-                  disabled={!!winner}
-                />
+               <Tombola
+                onDrawNumber={handleDrawNumber}
+                drawnNumbers={room.drawnNumbers}
+                currentNumber={room.currentNumber}
+                disabled={!!winner}
+                gameMode={room.gameMode}
+              />
               )}
 
               {!isHost && room.currentNumber && (
@@ -486,12 +487,13 @@ const GameRoom = () => {
             {/* EN DESKTOP: Columna derecha */}
             <div className="hidden lg:block space-y-6">
               {isHost && (
-                <Tombola
-                  onDrawNumber={handleDrawNumber}
-                  drawnNumbers={room.drawnNumbers}
-                  currentNumber={room.currentNumber}
-                  disabled={!!winner}
-                />
+              <Tombola
+                onDrawNumber={handleDrawNumber}
+                drawnNumbers={room.drawnNumbers}
+                currentNumber={room.currentNumber}
+                disabled={!!winner}
+                gameMode={room.gameMode}
+              />
               )}
 
               {!isHost && room.currentNumber && (
